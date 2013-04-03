@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+
+# Insert a new component in a list var (eg PATH)
+#
+# arg 1: list var to add to (PATH,MANPATH,etc)
+# arg 2: new element to add
+# arg 3: index or element to find (bash regex)
+# arg 4: set to anything to insert after index rather than default before
+list_insert () {
+  local _var _new _idx _after _list _found
+  _var=${1:?VAR required}
+  _new=${2:?NEW required}
+  _idx=${3:?INDEX required}
+  _after=${4}
+
+  IFS=:
+  _list=(${!_var})
+  unset IFS
+
+  if [[ ${_idx} =~ ^-?[0-9]+$ ]]; then
+    # idx is a numeric position
+    # convert negative index to distance from end of list
+    [[ ${_idx} -lt 0 ]] && _idx=$((${#_list[@]} + ${_idx}))
+    # advance to next item if inserting "after"
+    [[ -n $_after ]] && _idx=$((_idx + 1))
+
+  else
+    # idx is value to search for
+    _found=${_idx}
+    for ((i=0; i<=${#_list[@]}; ++i)); do
+      if [[ "${_list[${i}]}" =~ ${_idx} ]]; then
+        _found=${i}
+        break;
+      fi
+    done
+
+    if [[ $_found = $_idx ]]; then
+      # value not found in list
+      if [[ -n $_after ]]; then
+        # append to list for "after"
+        _idx=${#_list[@]}
+
+      else
+        # prepend to list
+        _idx=0
+      fi
+
+    else
+      # found the index of the desired item
+      _idx=${_found}
+      # advance to next item if inserting "after"
+      [[ -n $_after ]] && _idx=$((_idx + 1))
+    fi
+  fi
+
+  # construct new list in place
+  # (head new tail)
+  [[ ${_idx} -lt 0 ]] && _idx=0
+  _list=(${_list[@]:0:${_idx}} ${_new} ${_list[@]:${_idx}})
+
+  IFS=:
+  export ${_var}="${_list[*]}"
+  unset IFS
+} #end list_insert
