@@ -11,25 +11,25 @@ list_insert () {
   _var=${1:?VAR required}
   _new=${2:?NEW required}
   _idx=${3:?INDEX required}
-  _after=${4}
+  _after=$4
 
   IFS=:
   _list=(${!_var})
   unset IFS
 
-  if [[ ${_idx} =~ ^-?[0-9]+$ ]]; then
+  if [[ $_idx =~ ^-?[0-9]+$ ]]; then
     # idx is a numeric position
     # convert negative index to distance from end of list
-    [[ ${_idx} -lt 0 ]] && _idx=$((${#_list[@]} + ${_idx}))
+    [[ $_idx -lt 0 ]] && _idx=$((${#_list[@]} + $_idx))
     # advance to next item if inserting "after"
     [[ -n $_after ]] && _idx=$((_idx + 1))
 
   else
     # idx is value to search for
-    _found=${_idx}
+    _found=$_idx
     for ((i=0; i<=${#_list[@]}; ++i)); do
-      if [[ "${_list[${i}]}" =~ ${_idx} ]]; then
-        _found=${i}
+      if [[ ${_list[${i}]} =~ $_idx ]]; then
+        _found=$i
         break;
       fi
     done
@@ -47,7 +47,7 @@ list_insert () {
 
     else
       # found the index of the desired item
-      _idx=${_found}
+      _idx=$_found
       # advance to next item if inserting "after"
       [[ -n $_after ]] && _idx=$((_idx + 1))
     fi
@@ -55,10 +55,45 @@ list_insert () {
 
   # construct new list in place
   # (head new tail)
-  [[ ${_idx} -lt 0 ]] && _idx=0
-  _list=(${_list[@]:0:${_idx}} ${_new} ${_list[@]:${_idx}})
+  [[ $_idx -lt 0 ]] && _idx=0
+  _list=(${_list[@]:0:$_idx} $_new ${_list[@]:$_idx})
 
   IFS=:
-  export ${_var}="${_list[*]}"
+  export $_var="${_list[*]}"
   unset IFS
 } #end list_insert
+
+# Check to see if a list var (eg PATH) contains a given element
+#
+# arg 1: list to check (PATH,MANPATH,etc)
+# arg 2: element to find
+list_contains () {
+  local _var _elm _escelm _re
+  _var=$1
+  _elm=$2
+  _escelm=${_elm//\\//\\\\}
+  for c in \[ \] \( \) \. \^ \$ \? \* \+; do
+    _escelm=${_escelm//"$c"/"\\$c"}
+  done
+  _re="(^|:)${_escelm}(:|$)"
+  [[ ${!_var} =~ $_re ]]
+}
+
+# Add a new component to a list var (eg PATH) if it exists on the file system
+# and it isn't already in the list.
+#
+# arg 1: list to add to (PATH,MANPATH,etc)
+# arg 2: dir to add
+# arg 3: set for append instead of push (optional)
+# arg 4: index or element to find (bash regex) (optional)
+list_add_dir () {
+  local _var _dir _safedir _re
+  _var=$1
+  _dir=$2
+
+  if [[ -d $_dir ]]; then
+    list_contains $_var $_dir ||
+    list_insert $_var $_dir ${4:-$_dir} $3
+  fi
+} #end list_add
+
